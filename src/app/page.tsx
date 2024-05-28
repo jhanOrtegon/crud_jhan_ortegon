@@ -2,31 +2,11 @@
 import AddCircleIcon from "@mui/icons-material/AddCircle";
 import * as React from "react";
 import Box from "@mui/material/Box";
-import { DataGrid, GridColDef } from "@mui/x-data-grid";
-import { Button, Modal, Typography } from "@mui/material";
+import { DataGrid, GridColDef, GridDeleteIcon } from "@mui/x-data-grid";
+import { Button, Divider, FormControlLabel, FormLabel, IconButton, Modal, Radio, RadioGroup, TextField } from "@mui/material";
 import { useGetUsersQuery } from "@/services/usersApi";
-
-const columns: GridColDef<(typeof rows)[number]>[] = [
-  { field: "id", headerName: "ID", width: 90 },
-  {
-    field: "firstName",
-    headerName: "First name",
-    width: 150,
-    editable: true,
-  },
-];
-
-const rows = [
-  { id: 1, title: "Snow", firstName: "Jon", age: 14 },
-  { id: 2, lastName: "Lannister", firstName: "Cersei", age: 31 },
-  { id: 3, lastName: "Lannister", firstName: "Jaime", age: 31 },
-  { id: 4, lastName: "Stark", firstName: "Arya", age: 11 },
-  { id: 5, lastName: "Targaryen", firstName: "Daenerys", age: null },
-  { id: 6, lastName: "Melisandre", firstName: null, age: 150 },
-  { id: 7, lastName: "Clifford", firstName: "Ferrara", age: 44 },
-  { id: 8, lastName: "Frances", firstName: "Rossini", age: 36 },
-  { id: 9, lastName: "Roxie", firstName: "Harvey", age: 65 },
-];
+import { IUser } from "@/types/user";
+import { Edit } from "@mui/icons-material";
 
 const style = {
   position: "absolute" as "absolute",
@@ -40,14 +20,142 @@ const style = {
 };
 
 export default function Home() {
-  const [open, setOpen] = React.useState(false);
-  const handleOpen = () => setOpen(true);
-  const handleClose = () => setOpen(false);
 
-  const { data, isLoading } = useGetUsersQuery({});
+  // Status
+  const [open, setOpen] = React.useState(false);
+
+  const [trigger, setTrigger] = React.useState(0);
+
+  const [rows, setRows] = React.useState<IUser[]>([]);
+
+  const [title, setTitle] = React.useState<string>('');
+
+  const [id, setId] = React.useState<number>(0);
+
+  const [isEditable, setIsEditable] = React.useState<boolean>(false);
+
+  const [status, setStatus] = React.useState<string>('');
+
+  // services
+  const { data } = useGetUsersQuery({});
+
+  //GRid Data
+  const columns: GridColDef<(IUser)>[] = [
+    { field: "id", headerName: "ID", width: 90 },
+    {
+      field: "title",
+      headerName: "Titulo",
+      width: 550,
+      editable: true,
+    },
+    {
+      field: "completed",
+      headerName: "Estado",
+      width: 150,
+      editable: true,
+    },
+    {
+      field: 'actions',
+      headerName: 'Actions',
+      width: 150,
+      renderCell: (params) => (
+        <div>
+          <IconButton
+            color="primary"
+            onClick={() => handleEditClick(params.row)}
+          >
+            <Edit />
+          </IconButton>
+          <IconButton
+            color="secondary"
+            onClick={() => handleDeleteClick(params.row.id)}
+          >
+            <GridDeleteIcon />
+          </IconButton>
+        </div>
+      ),
+    },
+
+  ];
+
+
+  // Actions
+  const handleOpen = () => setOpen(true);
+
+  const handleClose = () => {
+    setTitle('');
+    setStatus('');
+    setIsEditable(false);
+    setOpen(false);
+  };
+
+  const handleDeleteClick = (id: number) => {
+    const data = rows;
+    const formatData = data?.filter((el: IUser) => el.id !== id);
+    setRows(formatData);
+    setTrigger(state => state + 1);
+  };
+
+  const handleEditClick = (user: IUser) => {
+    handleOpen();
+    setId(user.id);
+    setIsEditable(true);
+    setTitle(user.title);
+    setStatus(user.completed);
+  };
+
+  const onSubmit = () => {
+    if (title?.length && status) {
+      const formatData = rows;
+      const newData = [{ id: new Date().getTime(), title, completed: status }];
+
+      if (!isEditable) {
+        setRows([...newData, ...formatData]);
+      } else {
+        const formatData = rows?.map(el => {
+          if (el.id === id) {
+            return {
+              completed: status, id, title
+            };
+          }
+
+          return el;
+        });
+
+        setRows(formatData as unknown as IUser[]);
+      }
+
+      handleClose();
+    }
+  };
+
+  // Effects
+  React.useEffect(() => {
+    if (trigger) {
+      const formatData = rows?.map((el: IUser) => ({
+        id: el.id,
+        title: el.title,
+        completed: el.completed ? 'Completado' : 'Incompleto',
+      }));
+      setRows(formatData as unknown as IUser[]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trigger]);
+
+  React.useEffect(() => {
+    if (data?.length) {
+      const formatData = data?.map((el: IUser) => ({
+        id: el.id,
+        title: el.title,
+        completed: el.completed ? 'Completado' : 'Incompleto',
+      }));
+
+      setRows(formatData);
+    }
+  }, [data]);
 
   return (
-    <Box sx={{ width: "70%", margin: "auto" }}>
+    <Box sx={{ width: "80%", margin: "auto" }}>
       <Box
         sx={{
           display: "flex",
@@ -69,14 +177,14 @@ export default function Home() {
           </Button>
         </Box>
       </Box>
-      <Box sx={{ height: 400, width: "100%" }}>
+      <Box sx={{ height: 500, width: "100%" }}>
         <DataGrid
-          rows={rows}
+          rows={rows as unknown as IUser[]}
           columns={columns}
           initialState={{
             pagination: {
               paginationModel: {
-                pageSize: 5,
+                pageSize: 15,
               },
             },
           }}
@@ -94,12 +202,41 @@ export default function Home() {
           aria-describedby="modal-modal-description"
         >
           <Box sx={style}>
-            <Typography id="modal-modal-title" variant="h6" component="h2">
-              Text in a modal
-            </Typography>
-            <Typography id="modal-modal-description" sx={{ mt: 2 }}>
-              Duis mollis, est non commodo luctus, nisi erat porttitor ligula.
-            </Typography>
+            <Box sx={{ textAlign: 'center', fontSize: '28px' }}>Registro</Box>
+            <Divider />
+            <TextField
+              value={title}
+              size="small"
+              fullWidth sx={{ margin: '20px 0px' }}
+              label='Titulo'
+              variant="filled"
+              onChange={({ target }) => {
+                setTitle(target.value);
+              }}
+            />
+            <Box mb={2}>
+              <FormLabel id="demo-radio-buttons-group-label">Estado</FormLabel>
+              <RadioGroup
+                aria-labelledby="demo-radio-buttons-group-label"
+                defaultValue="Incompleto"
+                name="radio-buttons-group"
+                value={status}
+                onChange={(e) => {
+                  setStatus(e.target.value);
+                }}
+              >
+                <FormControlLabel value="Completado" control={<Radio />} label="Completado" />
+                <FormControlLabel value="Incompleto" control={<Radio />} label="Incompleto" />
+              </RadioGroup>
+            </Box>
+            <Button
+              fullWidth
+              variant="contained"
+              onClick={onSubmit}
+              disabled={!title?.length || !status}
+            >
+              {isEditable ? 'Editar' : 'Guardar'}
+            </Button>
           </Box>
         </Modal>
       </div>
